@@ -13,7 +13,7 @@ authors:
     affiliation: "Isom Lab"
 license: MIT
 version: 1.0.1
-repository-code: "https://github.com/dangerisom/pam_scanning"
+repository-code: "https://github.com/isomlab/pam_scanning"
 keywords:
   - CRISPR
   - Cas9

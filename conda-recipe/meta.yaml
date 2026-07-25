@@ -6,7 +6,7 @@ package:
   version: {{ version }}
 
 source:
-  url: https://github.com/dangerisom/{{ name }}/archive/refs/tags/v{{ version }}.tar.gz
+  url: https://github.com/isomlab/{{ name }}/archive/refs/tags/v{{ version }}.tar.gz
   sha256: d413775fccab8a830fbb10dcf335033c0b84080917cd0e007abc6ddaf92fe1e3
   # For a local `conda build` from this checkout instead, comment out the two lines
   # above and use:
@@ -41,12 +41,12 @@ test:
     - pam-scan --help
 
 about:
-  home: https://github.com/dangerisom/pam_scanning
+  home: https://github.com/isomlab/pam_scanning
   license: MIT
   license_family: MIT
   license_file: LICENSE
   summary: Design CRISPR guides and primers for ORF-wide chimera (PAM) scanning.
-  dev_url: https://github.com/dangerisom/pam_scanning
+  dev_url: https://github.com/isomlab/pam_scanning
 
 extra:
   recipe-maintainers:

@@ -43,7 +43,7 @@ opens the graphical app. Step-by-step guide: [`INSTALL.md`](INSTALL.md).
 ### conda (recommended)
 
 ```bash
-git clone https://github.com/dangerisom/pam_scanning.git
+git clone https://github.com/isomlab/pam_scanning.git
 cd pam_scanning
 conda env create -f environment.yml
 conda activate pam_scanning
