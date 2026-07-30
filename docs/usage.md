@@ -13,16 +13,16 @@ For *what* the tool computes (the algorithm behind these parameters), see
 | --- | --- | --- | --- |
 | `--orf` | `orf_file_path` | *(required, per ORF)* | ORF FASTA, ATG → stop. |
 | `--flank5` | `flank5_file_path` | *(one flank per side required)* | FASTA of the 100 bp immediately **upstream** of the ATG (the `-` side). Lets the scan reach positions at the start of the ORF. |
-| `--flank5-seq` | `flank5_sequence` | *(one flank per side required)* | The 5′ flank as a literal sequence instead of a FASTA file (A/C/G/T/N; a pasted FASTA record or base numbering is tolerated). Mutually exclusive with `--flank5`. |
+| `--flank5-seq` | `flank5_sequence` | *(one flank per side required)* | The 5′ flank as a literal sequence instead of a FASTA file. Mutually exclusive with `--flank5`. [†](#notes-on-specific-options) |
 | `--flank3` | `flank3_file_path` | *(one flank per side required)* | FASTA of the 100 bp immediately **downstream** of the stop (the `+` side). Lets the scan reach positions at the end of the ORF. |
 | `--flank3-seq` | `flank3_sequence` | *(one flank per side required)* | The 3′ flank as a literal sequence instead of a FASTA file. Mutually exclusive with `--flank3`. |
 | `--manifest` | *(n/a)* | *(none)* | TSV of ORFs (one row each) for batch runs; see [Multiple ORFs](#multiple-orfs). |
-| `--genome` | `local_genome_file_path` | bundled BY4741 genome | The **yeast** host genome FASTA for off-target checks. PAM scanning is always performed in yeast (the ORF is ported in from its source organism), so this is always a yeast genome. Defaults to the bundled *S. cerevisiae* BY4741 genome (shipped gzipped, expanded to `~/.pam_scanning/genome` on first use); override to use a different yeast species/strain/variant. |
-| `--blast-db` | `localBlastDb` | *(auto)* | **Optional.** When omitted, a BLAST+ database is built once from `--genome` with `makeblastdb`, cached in `~/.pam_scanning/blastdb` (keyed to the genome), and reused — so you never have to build one. Give a prebuilt database to override: a bare name (resolved via `$BLASTDB`), a path prefix, or a path to any member file (e.g. `/data/yeast.nin`, reduced to the prefix). In the GUI, **Browse database…** overrides and **Use genome (auto)** restores the default. |
+| `--genome` | `local_genome_file_path` | bundled BY4741 genome | The **yeast** host genome FASTA for off-target checks. [†](#notes-on-specific-options) |
+| `--blast-db` | `localBlastDb` | *(auto)* | **Optional.** A prebuilt BLAST+ database. Built automatically from `--genome` when omitted. [†](#notes-on-specific-options) |
 | `--gene-name` | `geneName` | *(required, per ORF)* | Label used in output filenames. |
 | `--codon-table` | `codon_table_file_path` | bundled yeast table | Codon-usage table (`.cusp`-style). |
 | `--codon-selection` | `codon_selection_file_path` | *(none, per ORF)* | `.xlsx` of specific residues to target; overrides sampling. |
-| `--codon-positions` | `codon_selection_positions` | *(none)* | Specific insertion codons as a position/range list, e.g. `"52, 89, 100-105"` (1-based). Overrides sampling; adds to `--codon-selection` if both are given. In the GUI this is the **Pick codons…** picker. |
+| `--codon-positions` | `codon_selection_positions` | *(none)* | Specific insertion codons as a position/range list, e.g. `"52, 89, 100-105"` (1-based). [†](#notes-on-specific-options) |
 | `--output` / `-o` | `outputPath` | `.` | Directory to write the time-stamped run into. |
 | `--guide-primer-forward-suffix` | `guidePrimerForwardSuffix` | `GTTTTAGAGCTAGAAATAGCAAGTTAAAATAAG` | Suffix that amplifies the CRISPR plasmid after the targeting sequence. |
 | `--insert-primer-forward-suffix` | `insertPrimerForwardSuffix` | `GAAGATGTTGTCTGTTGCTCTATGTCATAT` | 5′→3′ insertion-primer suffix (chimera payload, forward). |
@@ -32,6 +32,28 @@ For *what* the tool computes (the algorithm behind these parameters), see
 | `--codon-sampling-gap` | `codonsSamplingGap` | `1` | Insert at every Nth codon (1 = exhaustive). Ignored when a codon-selection file is given. |
 | `--max-pam-inclusions` | `pamInclusionThreshold` | `5` | Max allowed PAM inclusions per guide solution. |
 | `--max-pam-inclusion-length` | `pamInclusionSequenceThreshold` | `15` | Min matched length (bp) counted as a PAM inclusion. |
+
+### Notes on specific options
+
+Marked **†** in the table above.
+
+- **`--flank5-seq` / `--flank3-seq`** — accept A/C/G/T/N; a pasted FASTA record or base
+  numbering is tolerated and stripped.
+
+- **`--genome`** — PAM scanning is always performed in yeast (the ORF is ported in from
+  its source organism), so this is always a yeast genome. The bundled *S. cerevisiae*
+  BY4741 genome ships gzipped and is expanded to `~/.pam_scanning/genome` on first use.
+  Override it to use a different yeast species, strain, or variant.
+
+- **`--blast-db`** — when omitted, a BLAST+ database is built once from `--genome` with
+  `makeblastdb`, cached in `~/.pam_scanning/blastdb` (keyed to the genome), and reused,
+  so you never have to build one by hand. To override, give a bare name (resolved via
+  `$BLASTDB`), a path prefix, or a path to any member file (e.g. `/data/yeast.nin`,
+  which is reduced to the prefix). In the GUI, **Browse database…** overrides and
+  **Use genome (auto)** restores the default.
+
+- **`--codon-positions`** — overrides sampling, and adds to `--codon-selection` if both
+  are given. In the GUI this is the **Pick codons…** picker.
 
 ### Config file
 
@@ -202,8 +224,12 @@ under `--output`, containing:
 | `QC/‹gene›-guideSolutions.xlsx` | Per-codon optimal guide, silenced guide, cut gap, PAM inclusions, and insertion primers. |
 | `QC/‹gene›-scannableSequence.txt` | Fraction of the ORF that is PAM-scannable, plus the masked sequence and affected codons. |
 | `QC/solutionsFasta/‹gene›-‹codon›.fa` | SnapGene-viewable silenced ORF for each insertion site. |
-| `QC/` (copies) | The input ORF and 5′/3′ flank FASTA files (a flank entered as a sequence is written out as `‹gene›-flank5.fa`/`‹gene›-flank3.fa`), plus the assembled `‹gene›-orfPlusContext.fa`, for provenance. |
+| `QC/` (copies) | The input ORF and 5′/3′ flank FASTAs, plus the assembled `‹gene›-orfPlusContext.fa`, kept for provenance. |
 | `ORDER/‹gene›-primerOrder.xlsx` | Plate-laid-out guide + insertion primer order (96- or 384-well). |
 | `BLAST+/` | Raw and final `blastn` query/result files for off-target review. |
 | `WARNINGS/‹gene›-pamInclusionWarnings*.txt` | Guides carrying potential PAM inclusions (conservative + super-conservative). |
 | `WARNINGS/‹gene›-unscannableCodons.txt` | Codons for which no acceptable guide could be found. |
+
+A flank supplied as a literal sequence (`--flank5-seq` / `--flank3-seq`) is written out
+as `‹gene›-flank5.fa` / `‹gene›-flank3.fa`, so a run is reproducible from its own
+`QC/` folder either way.
