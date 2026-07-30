@@ -28,9 +28,17 @@ else is automatic.
 
 ## Step 2 — Get PAM Scanning and double-click to run
 
-1. Download this project as a folder:
-   - On the GitHub page, click the green **Code** button → **Download ZIP**.
-   - Unzip it somewhere easy to find, like your Desktop or Documents.
+1. Get the code. pam_scanning is a **public** repository, so no account or password
+   is needed — pick whichever way you prefer:
+   - **Download ZIP (simplest):** on the [GitHub page](https://github.com/isomlab/pam_scanning),
+     click the green **Code** button → **Download ZIP**, then unzip it somewhere easy
+     to find, like your Desktop or Documents.
+   - **GitHub Desktop (best if you'll update often):** [desktop.github.com](https://desktop.github.com)
+     → **File ▸ Clone repository… ▸ URL** → paste
+     `https://github.com/isomlab/pam_scanning` → **Clone**. Update later with
+     **Fetch/Pull origin**.
+   - **Terminal:** `git clone https://github.com/isomlab/pam_scanning.git`
+     (update later with `git pull`).
 2. Open the unzipped folder, then open the **`launchers`** folder inside it.
 3. Double-click the launcher for your computer:
    - **Mac**: **`PAM Scanning.command`**
