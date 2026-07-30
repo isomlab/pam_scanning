@@ -74,8 +74,9 @@ def plot_scannable_positions(qc_path, gene_name, codon_gaps, max_gap, fraction,
     top = max(step, int(np.ceil(max_gap / step) * step))
     boundaries = np.arange(0, top + step, step)
     n_bins = len(boundaries) - 1
-    cmap = mcolors.ListedColormap(cm.viridis(np.linspace(0.08, 0.90, n_bins)))
-    cmap.set_bad("white")
+    cmap = mcolors.ListedColormap(
+        cm.viridis(np.linspace(0.08, 0.90, n_bins))
+    ).with_extremes(bad="white")
     norm = mcolors.BoundaryNorm(boundaries, cmap.N)
 
     fig_w = min(13.5, cols * 0.34 + 3.4)
