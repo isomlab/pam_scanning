@@ -30,13 +30,10 @@ whichever way you prefer.
 3. Double-click the downloaded file to unzip it. You now have a folder called
    **`pam_scanning-main`** — move it somewhere easy, like your **Documents**.
 
-*(To update later, download a fresh ZIP and replace the folder.)*
-
 **Option B — GitHub Desktop (best if you'll update often).**
 1. Open GitHub Desktop → **File ▸ Clone repository… ▸ URL**.
 2. Paste `https://github.com/isomlab/pam_scanning` → pick a folder (e.g. Documents) → **Clone**. This makes a folder
    called **`pam_scanning`**.
-3. To update later, click **Fetch/Pull origin**.
 
 **Option C — `git clone` in Terminal.** Because the repo is public this just works,
 with no password:
@@ -45,8 +42,6 @@ with no password:
 cd ~/Documents
 git clone https://github.com/isomlab/pam_scanning.git
 ```
-
-*(To update later: `cd ~/Documents/pam_scanning && git pull`.)*
 
 Either way you now have a pam_scanning folder on your computer.
 
@@ -128,7 +123,6 @@ conda env remove -n pam_scanning
   `pip install` can be missing it.
 - **Setup failed partway through** — remove the half-built environment with
   `conda env remove -n pam_scanning` and double-click the launcher again.
-
 
 Stuck? Send Dan the exact command you ran and the message you got.
 
