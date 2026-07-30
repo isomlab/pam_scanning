@@ -124,14 +124,28 @@ each line so a selection can be pruned before running.
 
 ## Inputs
 
-| Input | Description |
-| --- | --- |
-| ORF FASTA (`--orf`) | The coding sequence, ATG → stop. |
-| 5′ flank (`--flank5` / `--flank5-seq`) | The 100 bp immediately upstream of the ATG (the `-` side), so positions at the start of the ORF can be scanned. Give a FASTA file or a literal sequence. |
-| 3′ flank (`--flank3` / `--flank3-seq`) | The 100 bp immediately downstream of the stop (the `+` side), so positions at the end of the ORF can be scanned. Give a FASTA file or a literal sequence. |
-| Genome FASTA (`--genome`) | The **yeast** host genome for off-target evaluation (also the source for your BLAST DB). PAM scanning is always run in yeast — the ORF is ported in from its source organism — so this is always a yeast genome. Defaults to the bundled BY4741 genome; override to pick a different yeast species/strain/variant. |
-| Codon table | Codon-usage table; the bundled yeast table is used if omitted. |
-| Codon selection (optional) | Specific residues to target, as an `.xlsx` (`--codon-selection`), a position list (`--codon-positions`), or the GUI **Pick codons…** picker. Omit to scan every codon (or every *N*th via the sampling gap). |
+- **ORF FASTA** (`--orf`) — the coding sequence, ATG → stop.
+
+- **5′ flank** (`--flank5` / `--flank5-seq`) — the 100 bp immediately upstream of the
+  ATG (the `-` side), so positions at the start of the ORF can be scanned. Give a FASTA
+  file or a literal sequence.
+
+- **3′ flank** (`--flank3` / `--flank3-seq`) — the 100 bp immediately downstream of the
+  stop (the `+` side), so positions at the end of the ORF can be scanned. Give a FASTA
+  file or a literal sequence.
+
+- **Genome FASTA** (`--genome`) — the **yeast** host genome for off-target evaluation,
+  and the source for your BLAST database. PAM scanning is always run in yeast (the ORF
+  is ported in from its source organism), so this is always a yeast genome. Defaults to
+  the bundled BY4741 genome; override it to pick a different yeast species, strain, or
+  variant.
+
+- **Codon table** — codon-usage table. The bundled yeast table is used if omitted.
+
+- **Codon selection** (optional) — the specific residues to target, as an `.xlsx`
+  (`--codon-selection`), a position list (`--codon-positions`), or the GUI's
+  **Pick codons…** picker. Omit it to scan every codon, or every *N*th via the
+  sampling gap.
 
 For a batch of ORFs, a TSV manifest (`--manifest`) supplies the ORF, 5′/3′ flank, and
 optional codon-selection paths one row at a time; see [`docs/usage.md`](docs/usage.md#multiple-orfs).
