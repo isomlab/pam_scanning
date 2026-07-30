@@ -25,7 +25,7 @@ off-target-screened, per-codon-optimal guides and orderable primers — see
 - [Prerequisites: a local BLAST database](#prerequisites-a-local-blast-database)
 - [Usage](#usage) — [command line](#command-line) and [graphical interface](#graphical-interface)
 - [Inputs](#inputs)
-- **Docs:** [pipeline overview](docs/pipeline.md) · [full usage reference](docs/usage.md) · [BLAST setup](docs/blast_setup.md) · [non-coder install guide](INSTALL.md)
+- **Docs:** [pipeline overview](docs/pipeline.md) · [full usage reference](docs/usage.md) · [BLAST setup](docs/blast_setup.md) · [install from scratch](docs/INSTALL.md) · [getting started](docs/getting_started.md)
 
 ## Install & run
 
@@ -34,46 +34,30 @@ off-target-screened, per-codon-optimal guides and orderable primers — see
 - **macOS:** in the `launchers` folder, double-click **`PAM Scanning.command`**
 - **Windows:** double-click **`launchers\PAM Scanning.bat`**
 
-The first launch sets everything up on its own — Python, the app, and the external
-**NCBI BLAST+** toolkit it depends on (it needs [Miniforge](https://conda-forge.org/download/)
-— a free, one-time install); after that it opens straight away. Step-by-step,
-including how to download the code: **[INSTALL.md](INSTALL.md)**.
+The first launch sets everything up on its own — Python, the app, and the external **NCBI BLAST+** toolkit it depends on (it needs
+[Miniforge](https://conda-forge.org/download/) — a free, one-time install; brand new
+to this? see the [install-from-scratch guide](docs/INSTALL.md)); after that it opens
+straight away. Step-by-step, including how to download the code:
+**[getting started](docs/getting_started.md)**.
 
-pam_scanning is a **public** repository, so nothing here needs a GitHub account.
+PAM Scanning is a **public** repository, so nothing here needs a GitHub account.
 
 <details>
 <summary><b>Prefer the command line?</b> — conda or pip</summary>
 
-**conda (recommended** — it brings BLAST+ with it):
-
 ```bash
-git clone https://github.com/isomlab/pam_scanning.git
-cd pam_scanning
+# conda (its Python includes the GUI toolkit):
 conda env create -f environment.yml
 conda activate pam_scanning
-pam-scan --help          # or: pam-scan-gui
+pam-scan-gui
+
+# or plain pip, from a clone (needs a Python that already has tkinter):
+pip install -e .
 ```
 
-This installs Python, `openpyxl`, `matplotlib`, **BLAST+**, and the `pam_scanning`
-package itself (editable). Once the [Bioconda](https://bioconda.github.io/) release is
-published you will also be able to run:
-
-```bash
-conda install -c bioconda -c conda-forge pam_scanning
-```
-
-**pip:**
-
-```bash
-pip install pam_scanning
-```
-
-`pip` does **not** install BLAST+ — install it separately (e.g.
-`conda install -c bioconda blast`, or from the
-[NCBI BLAST+ executables](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)).
-If `blastn` is missing when you run a scan, the GUI offers to download BLAST+ for you
-(and the CLI accepts `--install-blast`) — the official NCBI binaries are placed in
-`~/.pam_scanning/blast`, with no conda required and nothing added to your environment.
+`pip` does **not** install BLAST+ — the conda route does. If `blastn` is missing when
+you run a scan, the GUI offers to fetch it for you and the CLI accepts
+`--install-blast`. Details: [`docs/blast_setup.md`](docs/blast_setup.md).
 
 </details>
 
