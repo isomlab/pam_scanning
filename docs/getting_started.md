@@ -1,76 +1,48 @@
 # Getting started with PAM Scanning
 
-This guide gets PAM Scanning running on your computer. You do **not** need to know how
-to code — follow the steps and copy-paste where asked. It takes about 10 minutes,
-once. After that, launching it is a double-click.
+PAM Scanning designs CRISPR/Cas9 guide RNAs and chimera-insertion primers across an
+ORF, with synonymous PAM silencing and BLAST+ off-target screening.
 
-> On Windows everything below works the same — use the **Miniforge Prompt** app
-> wherever this says "Terminal", and see the Windows note in each step.
+Everything the lab tools have in common — downloading, launching, updating, and what
+to do when something goes wrong — is on one shared page: **[Getting started with a lab
+tool](https://dangerisom.github.io/Isom-Lab/getting-started/)**. This guide covers
+only what is specific to PAM Scanning.
 
 ---
 
 ## Before you start
 
-This guide assumes your computer already has **conda** (Miniforge, Miniconda, or
-Anaconda).
+Your computer needs **conda** (Miniforge, Miniconda, or Anaconda).
 
-> **First time? Never installed conda?** Do the one-time
-> **[install-from-scratch guide → INSTALL.md](INSTALL.md)** first, then come back here.
-
----
-
-## Step 1 — Get the code
-
-PAM Scanning is a **public** repository, so no account or password is needed. Pick
-whichever way you prefer.
-
-**Option A — Download ZIP (fastest, nothing to install).**
-1. Open **[github.com/isomlab/pam_scanning](https://github.com/isomlab/pam_scanning)**.
-2. Click the green **`Code ▾`** button → **Download ZIP**.
-3. Double-click the downloaded file to unzip it. You now have a folder called
-   **`pam_scanning-main`** — move it somewhere easy, like your **Documents**.
-
-**Option B — GitHub Desktop (best if you'll update often).**
-1. Open GitHub Desktop → **File ▸ Clone repository… ▸ URL**.
-2. Paste `https://github.com/isomlab/pam_scanning` → pick a folder (e.g. Documents) → **Clone**. This makes a folder
-   called **`pam_scanning`**.
-
-**Option C — `git clone` in Terminal.** Because the repo is public this just works,
-with no password:
-
-```bash
-cd ~/Documents
-git clone https://github.com/isomlab/pam_scanning.git
-```
-
-Either way you now have a pam_scanning folder on your computer.
+> **First time on this computer?** Do the one-time **[Setting up your
+> computer](https://dangerisom.github.io/Isom-Lab/setup/)** first, then come back here.
+> PAM Scanning's own install notes are in **[INSTALL.md](INSTALL.md)**.
 
 ---
 
-## Step 2 — Launch it
+## Get it and launch it
 
-**Open the `launchers` folder inside that folder and double-click:**
+**1. Download it** from
+   **[github.com/isomlab/pam_scanning](https://github.com/isomlab/pam_scanning)**. It
+   is **public**, so no account or password is needed: **Download ZIP**, **GitHub
+   Desktop**, or `git clone`. Step by step: **[Get the
+   code](https://dangerisom.github.io/Isom-Lab/getting-started/#public-tools)**.
+
+**2. Open the `launchers` folder inside it and double-click:**
 
 - **Mac:** `PAM Scanning.command`
 - **Windows:** `PAM Scanning.bat`
 
-That's it. The **first** launch takes a few minutes: it builds a private, isolated
-conda environment (named `pam_scanning`) containing Python, the app, and the external **NCBI BLAST+** toolkit it depends on, then opens the app.
-**Every launch after that opens straight away.**
+The **first** launch takes a few minutes while it builds a private, isolated conda
+environment named `pam_scanning` containing Python and everything the app needs. Every
+launch after that opens straight away. You don't need to type anything.
 
-You don't need to type anything, and it won't touch any other Python on your computer.
-
-> **Mac note:** the first time, macOS may say the file is from an unidentified
-> developer. Right-click (or Control-click) the file → **Open** → **Open**. You only
-> do this once.
-
-> **Mac, if double-clicking does nothing:** the file may have lost its executable
-> flag when unzipped. In Terminal, run
-> `chmod +x "<your folder>/launchers/PAM Scanning.command"` once, then double-click again.
+If macOS blocks the file, or double-clicking does nothing, see **[Launch
+it](https://dangerisom.github.io/Isom-Lab/getting-started/#launch-it)**.
 
 ---
 
-## Step 3 — Use it
+## Use it
 
 1. **Choose your ORF** and its flanking genomic sequence.
 2. **Pick the codons** to scan — every codon by default, or a chosen subset.
@@ -94,14 +66,10 @@ pam-scan-fetch-cds --help    # fetch a CDS from UniProt
 
 ## Updating later
 
-- **GitHub Desktop (Option B):** open it and click **Fetch / Pull origin**.
-- **`git clone` (Option C):** `cd ~/Documents/pam_scanning && git pull`.
-- **Downloaded the ZIP (Option A):** download a fresh ZIP and replace the old
-  folder's contents (keep the same folder name and location).
-
-The environment installs the code in "editable" mode, so an update takes effect the
-next time you launch — no reinstall. If a release changes the dependencies, delete the
-environment and let the launcher rebuild it:
+Refresh the folder the way you got it — see **[Updating
+later](https://dangerisom.github.io/Isom-Lab/getting-started/#updating-later)**. If a
+release changes what the tool depends on, delete its environment and let the launcher
+rebuild it on the next double-click:
 
 ```bash
 conda env remove -n pam_scanning
@@ -111,35 +79,7 @@ conda env remove -n pam_scanning
 
 ## If something goes wrong
 
-- **"conda: command not found"** — close and reopen Terminal after installing conda
-  (the installer needs a fresh window). On Mac, if it still isn't found, run
-  `source ~/miniforge3/bin/activate` once.
-- **The launcher says it can't find conda** — same cause. Install conda from the
-  [install-from-scratch guide](INSTALL.md), then double-click the launcher again.
-- **"pam-scan-gui: command not found"** — you probably forgot
-  `conda activate pam_scanning` first. Run it, then try again.
-- **The window doesn't appear** — make sure you used the **conda** install above; its
-  Python includes the graphics toolkit the app needs. A plain system-Python
-  `pip install` can be missing it.
-- **Setup failed partway through** — remove the half-built environment with
-  `conda env remove -n pam_scanning` and double-click the launcher again.
+The usual problems are on the shared page: **[If something goes
+wrong](https://dangerisom.github.io/Isom-Lab/getting-started/#if-something-goes-wrong)**.
 
-Stuck? Send Dan the exact command you ran and the message you got.
-
----
-
-## Alternative: plain `pip` (if you don't use conda)
-
-Conda is recommended because it guarantees the GUI toolkit is present. If you'd rather
-use `pip`, from inside the pam_scanning folder:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -e .
-pam-scan-gui
-```
-
-This only works if your Python includes **tkinter**: macOS's built-in `python3` does;
-Homebrew Python needs `brew install python-tk`; conda always does. Note that `pip`
-does **not** install BLAST+ — see [`blast_setup.md`](blast_setup.md).
+Stuck? Send Dan (<a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#100;&#105;&#115;&#111;&#109;&#64;&#109;&#105;&#97;&#109;&#105;&#46;&#101;&#100;&#117;">&#100;&#105;&#115;&#111;&#109;<span>&#64;</span>&#109;&#105;&#97;&#109;&#105;<span>&#46;</span>&#101;&#100;&#117;</a>) the exact command you ran and the message you got.
