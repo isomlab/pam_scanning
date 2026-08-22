@@ -18,4 +18,5 @@ dependencies:
   - blast >=2.12        # NCBI BLAST+: provides blastn (and makeblastdb)
   - pip
   - pip:
-      - .               # install pam_scanning -> the pam-scan / pam-scan-gui commands
+      - -e .            # editable, like the rest of the lab tools: a git pull is then
+                        # the whole update. Installs the pam-scan / pam-scan-gui commands.

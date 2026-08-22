@@ -20,7 +20,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, font as tkfont
 from pathlib import Path
 
-from pam_scanning import fetch_cds
+from pam_scanning import __version__, fetch_cds
 from pam_scanning.chimeras import parse_sequence_text, parse_codon_positions
 from pam_scanning.cli import blast_db_prefix, discover_orf_folder, gene_name_from_orf_path
 
@@ -554,7 +554,7 @@ class CodonPicker(tk.Toplevel):
 
 def main():
     root = tk.Tk()
-    root.title("PAM Scanning")
+    root.title(f"PAM Scanning v{__version__}")
     root.configure(bg=BG)
     root.minsize(1380, 860)
     root.geometry("1580x920")
