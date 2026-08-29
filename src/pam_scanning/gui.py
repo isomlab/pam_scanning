@@ -933,12 +933,16 @@ def main():
     ttk.Radiobutton(radios, text="Global flanks (one 5'/3' pair for all ORFs)", value="global",
                     variable=flank_mode, style="Mode.TRadiobutton").pack(side="left")
 
-    # Global flank pickers (shown only in global mode). Held in a container so
-    # the whole block can collapse without disturbing the layout order below.
+    # Global flank pickers (shown only in global mode). The card stays packed
+    # inside the holder for the life of the window and the HOLDER is what gets
+    # hidden: Tk never shrinks a frame back to nothing once it has managed a
+    # slave, so forgetting the card would leave the holder standing at its old
+    # height and open a blank gap above the ORFs section.
     global_flank_holder = ttk.Frame(content, style="TFrame")
     global_flank_holder.pack(fill="x")
     global_flank_card = ttk.Frame(global_flank_holder, style="Card.TFrame")
     global_flank_card.columnconfigure(0, weight=1)
+    global_flank_card.pack(fill="x")
 
     def refresh_global_flank_source(*_):
         """Show the Browse row or the sequence box, per flank, per selected source."""
@@ -1137,12 +1141,25 @@ def main():
         "not needed.")
     folder_tip = None   # assigned once the folder button is created, below
 
+    # Remembered on the first refresh, while the holder is still packed: the
+    # sibling it sits above, so re-showing it restores the original order
+    # instead of dropping it at the bottom of the form.
+    flank_holder_anchor = []
+
     def refresh_flank_mode(*_):
         glob = flank_mode.get() == "global"
+        if not flank_holder_anchor:
+            slaves = content.pack_slaves()
+            i = slaves.index(global_flank_holder)
+            flank_holder_anchor.append(slaves[i + 1] if i + 1 < len(slaves) else None)
         if glob:
-            global_flank_card.pack(fill="x")
+            anchor = flank_holder_anchor[0]
+            if anchor is not None and anchor.winfo_exists():
+                global_flank_holder.pack(fill="x", before=anchor)
+            else:
+                global_flank_holder.pack(fill="x")
         else:
-            global_flank_card.pack_forget()
+            global_flank_holder.pack_forget()
         for entry in orf_entries:
             apply_flank_mode_to_entry(entry)
         if folder_tip is not None:
