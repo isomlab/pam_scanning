@@ -66,3 +66,50 @@ def test_parse_codon_positions_ignores_junk_and_empty():
     assert _pcp("") == []
     assert _pcp(None) == []
     assert _pcp("1-2-3, 7, abc") == [7]   # malformed range dropped, valid kept
+
+
+# --- ORF + flanks in one file -------------------------------------------
+
+def test_split_orf_plus_returns_the_flanks_around_the_orf():
+    from pam_scanning.chimeras import split_orf_plus
+    flank5, orf, flank3 = "AAAACCCC", "ATGGGGTAA", "TTTTGGGG"
+    assert split_orf_plus(flank5 + orf + flank3, orf) == (flank5, flank3)
+
+
+def test_split_orf_plus_is_case_insensitive_and_uppercases():
+    from pam_scanning.chimeras import split_orf_plus
+    assert split_orf_plus("aaaaATGTAAtttt", "atgtaa") == ("AAAA", "TTTT")
+
+
+def test_split_orf_plus_does_not_assume_a_flank_length():
+    """Any flank size works, so 30 bp files are handled as well as 100 bp ones."""
+    from pam_scanning.chimeras import split_orf_plus
+    orf = "ATG" + "GCT" * 40 + "TAA"
+    for n in (5, 30, 100, 250):
+        f5, f3 = "A" * n, "T" * n
+        assert split_orf_plus(f5 + orf + f3, orf) == (f5, f3)
+
+
+def test_split_orf_plus_rejects_a_missing_orf():
+    import pytest
+    from pam_scanning.chimeras import split_orf_plus
+    with pytest.raises(ValueError, match="not found"):
+        split_orf_plus("AAAACCCCTTTT", "ATGGGGTAA")
+
+
+def test_split_orf_plus_rejects_an_ambiguous_orf():
+    import pytest
+    from pam_scanning.chimeras import split_orf_plus
+    orf = "ATGGGGTAA"
+    with pytest.raises(ValueError, match="occurs 2 times"):
+        split_orf_plus("AAAA" + orf + "TTTT" + orf, orf)
+
+
+def test_split_orf_plus_rejects_a_zero_length_flank():
+    import pytest
+    from pam_scanning.chimeras import split_orf_plus
+    orf = "ATGGGGTAA"
+    with pytest.raises(ValueError, match="zero length"):
+        split_orf_plus(orf + "TTTT", orf)
+    with pytest.raises(ValueError, match="zero length"):
+        split_orf_plus("AAAA" + orf, orf)
