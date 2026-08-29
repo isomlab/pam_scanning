@@ -33,3 +33,39 @@ def test_corrupt_state_is_tolerated(tmp_path, monkeypatch):
     state.write_text("{ not valid json")
     monkeypatch.setattr(gui, "_STATE_PATH", state)
     assert gui._load_last_dir() == os.getcwd()  # no exception
+
+
+# --- scroll direction ----------------------------------------------------
+# The sign here was got wrong twice by hard-coding a reversal. These lock it to
+# Tk's own convention: ::tk::MouseWheel divides by a NEGATIVE factor, so a
+# positive delta scrolls the view UP, and X11 button 4 is wheel-up.
+
+def test_positive_delta_scrolls_the_view_up():
+    from pam_scanning.gui import wheel_step
+    assert wheel_step(None, 120) == -1
+    assert wheel_step(None, 3) == -1
+
+
+def test_negative_delta_scrolls_the_view_down():
+    from pam_scanning.gui import wheel_step
+    assert wheel_step(None, -120) == 1
+    assert wheel_step(None, -3) == 1
+
+
+def test_x11_buttons_follow_the_same_convention():
+    from pam_scanning.gui import wheel_step
+    assert wheel_step(4, 0) == -1     # button 4 is wheel up
+    assert wheel_step(5, 0) == 1      # button 5 is wheel down
+
+
+def test_zero_delta_does_not_scroll():
+    from pam_scanning.gui import wheel_step
+    assert wheel_step(None, 0) == 0
+
+
+def test_direction_matches_tk_mousewheel_for_a_range_of_deltas():
+    """tk::MouseWheel is `yview scroll [expr {$amount/$factor}]` with factor<0."""
+    from pam_scanning.gui import wheel_step
+    for delta in (-240, -120, -40, -1, 1, 40, 120, 240):
+        tk_sign = -1 if (delta / -40.0) < 0 else 1
+        assert wheel_step(None, delta) == tk_sign, delta
