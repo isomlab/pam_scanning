@@ -91,6 +91,9 @@ CONSOLE_BG = "#0f1b28"  # progress console background
 CONSOLE_FG = "#d7e0ea"  # progress console text
 CONSOLE_MUTED = "#7f93a8"
 PLACEHOLDER = "No file selected"
+# Shown by the codon picker while nothing is chosen; the "(optional)" matches the
+# file rows so both codon-selection controls read the same way.
+NO_CODONS_PICKED = "No codons picked graphically  (optional)"
 
 # Per-ORF flank inputs (used only in per-ORF flank mode).
 ORF_FLANK_FIELDS = [
@@ -899,13 +902,31 @@ def main():
         card.columnconfigure(weighted_col, weight=1)
         return card
 
-    def add_file_row(card, row, button_label, tip, var, *, button_text=None, button_width=26):
+    def add_file_row(card, row, button_label, tip, var, *, button_text=None, button_width=26,
+                     optional=False):
         """Add a path-label + Browse-button row; return its widgets (for show/hide).
 
         By default the button reads "Browse  <button_label>"; pass *button_text* to
         set the label verbatim (and *button_width* to size it).
+
+        With *optional*, the row's label reads "No file selected  (optional)" while
+        nothing is chosen, so the reader does not have to hover to learn the input
+        can be left out. The path variable itself is untouched and still holds the
+        PLACEHOLDER sentinel that the pipeline treats as "not provided".
         """
-        path_lbl = ttk.Label(card, textvariable=var, style="Path.TLabel",
+        display = var
+        if optional:
+            display = tk.StringVar()
+
+            def _mirror(*_, source=var, shown=display):
+                value = source.get()
+                shown.set("%s  (optional)" % PLACEHOLDER
+                          if not value or value == PLACEHOLDER else value)
+
+            _mirror()
+            var.trace_add("write", _mirror)
+
+        path_lbl = ttk.Label(card, textvariable=display, style="Path.TLabel",
                              wraplength=560, anchor="w", justify="left")
         path_lbl.grid(row=row, column=0, sticky="we", padx=(14, 6), pady=10)
 
@@ -1064,7 +1085,7 @@ def main():
         positions = entry.get("codon_positions") or []
         var = entry["_picked_var"]
         if not positions:
-            var.set("No codons picked graphically")
+            var.set(NO_CODONS_PICKED)
             return
         shown = ", ".join(str(p) for p in positions[:14]) + (" …" if len(positions) > 14 else "")
         var.set("%d codon(s) picked: %s" % (len(positions), shown))
@@ -1174,11 +1195,12 @@ def main():
                      "insertion points for THIS ORF from an .xlsx file (residue numbers in "
                      "column 1); overrides the codon sampling frequency below. Leave unset to "
                      "scan by the sampling frequency.", sel_var,
-                     button_text="Codon Selection: by File (optional)", button_width=36)
+                     button_text="Codon Selection: by File (optional)", button_width=36,
+                     optional=True)
 
         # Graphical alternative to the .xlsx: pick insertion codons from the protein.
         entry["codon_positions"] = []
-        picked_var = tk.StringVar(value="No codons picked graphically")
+        picked_var = tk.StringVar(value=NO_CODONS_PICKED)
         entry["_picked_var"] = picked_var
         picked_lbl = ttk.Label(card, textvariable=picked_var, style="Path.TLabel",
                                wraplength=560, anchor="w", justify="left")
@@ -1370,7 +1392,9 @@ def main():
     # --- Shared input files ---------------------------------------------
     card = section("Shared input files", 0)
     for r, (key, blabel, tip) in enumerate(SHARED_FILE_FIELDS):
-        add_file_row(card, r, blabel, tip, shared_file_vars[key])
+        # A field whose own label says "(optional)" says so on its path line too.
+        add_file_row(card, r, blabel, tip, shared_file_vars[key],
+                     optional="(optional)" in blabel)
 
     # Local BLAST database: browse to any member file; store the -db prefix.
     db_row = len(SHARED_FILE_FIELDS)
