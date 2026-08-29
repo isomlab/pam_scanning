@@ -113,3 +113,57 @@ def test_split_orf_plus_rejects_a_zero_length_flank():
         split_orf_plus(orf + "TTTT", orf)
     with pytest.raises(ValueError, match="zero length"):
         split_orf_plus("AAAA" + orf, orf)
+
+
+# --- homology arms and short flanks -------------------------------------
+# A 5' flank shorter than the arm used to drive the left slice index negative,
+# so Python read from the END of the sequence and the arm came back EMPTY. The
+# primer was then nothing but its suffix. These pin the clamped behaviour.
+
+def _assembled(flank5, orf_len=300, flank3=100):
+    orf = "ATG" + "GCT" * ((orf_len - 6) // 3) + "TAA"
+    return "A" * flank5 + orf + "T" * flank3, flank5
+
+
+def test_full_arms_when_the_flank_is_long_enough():
+    from pam_scanning.chimeras import homology_arms
+    seq, i = _assembled(100)
+    left, right = homology_arms(seq, i, 70, 70)
+    assert len(left) == 70 and len(right) == 70
+
+
+def test_short_flank_shortens_the_arm_instead_of_emptying_it():
+    from pam_scanning.chimeras import homology_arms
+    seq, i = _assembled(30)
+    left, _right = homology_arms(seq, i, 70, 70)
+    assert left, "a short 5' flank must not produce an empty homology arm"
+    assert len(left) == 33          # the 30 nt flank plus the 3 nt of the codon
+
+
+def test_arm_never_wraps_to_the_end_of_the_sequence():
+    """The old negative index read the tail of the sequence, which is worse
+    than a short arm: it is the wrong sequence entirely."""
+    from pam_scanning.chimeras import homology_arms
+    seq, i = _assembled(30)
+    left, _ = homology_arms(seq, i, 70, 70)
+    assert set(left) <= set("AATGC"), left
+    assert not left.endswith("T" * 10)
+
+
+def test_arms_shorten_smoothly_as_the_flank_shrinks():
+    from pam_scanning.chimeras import homology_arms
+    lengths = []
+    for flank5 in (100, 70, 50, 30, 10, 0):
+        seq, i = _assembled(flank5)
+        left, _ = homology_arms(seq, i, 70, 70)
+        lengths.append(len(left))
+    assert lengths == sorted(lengths, reverse=True)
+    assert lengths[0] == 70 and lengths[-1] == 3
+
+
+def test_right_arm_clamps_at_the_end_too():
+    from pam_scanning.chimeras import homology_arms
+    seq, i = _assembled(100, flank3=10)
+    insertion = len(seq) - 10 - 3   # near the 3' end
+    _left, right = homology_arms(seq, insertion, 70, 70)
+    assert 0 < len(right) <= 70
