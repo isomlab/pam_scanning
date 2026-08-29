@@ -91,6 +91,9 @@ CONSOLE_BG = "#0f1b28"  # progress console background
 CONSOLE_FG = "#d7e0ea"  # progress console text
 CONSOLE_MUTED = "#7f93a8"
 PLACEHOLDER = "No file selected"
+# Shown by the codon picker while nothing is chosen; the "(optional)" matches the
+# file rows so both codon-selection controls read the same way.
+NO_CODONS_PICKED = "No codons picked graphically  (optional)"
 
 # Per-ORF flank inputs (used only in per-ORF flank mode).
 ORF_FLANK_FIELDS = [
@@ -102,6 +105,28 @@ ORF_FLANK_FIELDS = [
      "PAM-scanning context). This lets the scan reach guide/primer positions at the end of "
      "the ORF."),
 ]
+
+# The per-ORF alternative to the two flank files above: one FASTA holding
+# flank5 + ORF + flank3. The ORF file is still required and locates the ORF
+# inside it, so any flank length works.
+ORF_PLUS_FIELD = (
+    "orf_plus_file_path", "ORF + flanks",
+    "FASTA holding the 5' flank, the ORF and the 3' flank as ONE sequence. The ORF "
+    "file above is still required: it is found inside this sequence by exact match "
+    "and the flanks are taken from either side, so the flanks may be any length. Use "
+    "this when your ORF and its context live in a single file rather than three.")
+
+# Help for the Flank inputs mode radios.
+FLANK_MODE_TIPS = {
+    "per_orf": (
+        "Each ORF carries its own flanking sequence. Every ORF card then offers a "
+        "choice: two separate flank files, or one file holding the ORF with its "
+        "flanks around it. Use this when the ORFs come from different loci."),
+    "global": (
+        "One 5'/3' flank pair is applied to EVERY ORF, given once above the ORF "
+        "cards as files or as typed sequences. Use this when all ORFs are inserted "
+        "into the same locus and share the same context."),
+}
 
 # Global flank inputs (used only in global flank mode; one pair for every ORF).
 # Each tuple: (key, section label, short name for buttons/messages, tooltip). The
@@ -877,13 +902,31 @@ def main():
         card.columnconfigure(weighted_col, weight=1)
         return card
 
-    def add_file_row(card, row, button_label, tip, var, *, button_text=None, button_width=26):
+    def add_file_row(card, row, button_label, tip, var, *, button_text=None, button_width=26,
+                     optional=False):
         """Add a path-label + Browse-button row; return its widgets (for show/hide).
 
         By default the button reads "Browse  <button_label>"; pass *button_text* to
         set the label verbatim (and *button_width* to size it).
+
+        With *optional*, the row's label reads "No file selected  (optional)" while
+        nothing is chosen, so the reader does not have to hover to learn the input
+        can be left out. The path variable itself is untouched and still holds the
+        PLACEHOLDER sentinel that the pipeline treats as "not provided".
         """
-        path_lbl = ttk.Label(card, textvariable=var, style="Path.TLabel",
+        display = var
+        if optional:
+            display = tk.StringVar()
+
+            def _mirror(*_, source=var, shown=display):
+                value = source.get()
+                shown.set("%s  (optional)" % PLACEHOLDER
+                          if not value or value == PLACEHOLDER else value)
+
+            _mirror()
+            var.trace_add("write", _mirror)
+
+        path_lbl = ttk.Label(card, textvariable=display, style="Path.TLabel",
                              wraplength=560, anchor="w", justify="left")
         path_lbl.grid(row=row, column=0, sticky="we", padx=(14, 6), pady=10)
 
@@ -928,10 +971,14 @@ def main():
     mode_card.pack(fill="x")
     radios = ttk.Frame(mode_card, style="Card.TFrame")
     radios.pack(anchor="w", padx=14, pady=10)
-    ttk.Radiobutton(radios, text="Per-ORF flanks", value="per_orf", variable=flank_mode,
-                    style="Mode.TRadiobutton").pack(side="left", padx=(0, 24))
-    ttk.Radiobutton(radios, text="Global flanks (one 5'/3' pair for all ORFs)", value="global",
-                    variable=flank_mode, style="Mode.TRadiobutton").pack(side="left")
+    per_orf_radio = ttk.Radiobutton(radios, text="Per-ORF flanks", value="per_orf",
+                                    variable=flank_mode, style="Mode.TRadiobutton")
+    per_orf_radio.pack(side="left", padx=(0, 24))
+    global_radio = ttk.Radiobutton(radios, text="Global flanks (one 5'/3' pair for all ORFs)",
+                                   value="global", variable=flank_mode, style="Mode.TRadiobutton")
+    global_radio.pack(side="left")
+    attach_tip(per_orf_radio, FLANK_MODE_TIPS["per_orf"])
+    attach_tip(global_radio, FLANK_MODE_TIPS["global"])
 
     # Global flank pickers (shown only in global mode). The card stays packed
     # inside the holder for the life of the window and the HOLDER is what gets
@@ -1012,19 +1059,33 @@ def main():
         orf_entries.remove(entry)
         renumber_orfs()
 
-    def apply_flank_mode_to_entry(entry):
-        show = flank_mode.get() == "per_orf"
+    def apply_orf_flank_source(entry):
+        """Within an ORF card, show either the two flank rows or the combined row."""
+        if flank_mode.get() != "per_orf":
+            return
+        separate = entry["flank_source"].get() == "separate"
         for w in entry["flank_widgets"]:
-            if show:
-                w.grid()
-            else:
+            w.grid() if separate else w.grid_remove()
+        for w in entry["orf_plus_widgets"]:
+            w.grid_remove() if separate else w.grid()
+
+    def apply_flank_mode_to_entry(entry):
+        """Global mode hides everything per-ORF about flanks, including the choice."""
+        per_orf = flank_mode.get() == "per_orf"
+        if not per_orf:
+            for w in (entry["source_widgets"] + entry["flank_widgets"]
+                      + entry["orf_plus_widgets"]):
                 w.grid_remove()
+            return
+        for w in entry["source_widgets"]:
+            w.grid()
+        apply_orf_flank_source(entry)
 
     def update_picked_label(entry):
         positions = entry.get("codon_positions") or []
         var = entry["_picked_var"]
         if not positions:
-            var.set("No codons picked graphically")
+            var.set(NO_CODONS_PICKED)
             return
         shown = ", ".join(str(p) for p in positions[:14]) + (" …" if len(positions) > 14 else "")
         var.set("%d codon(s) picked: %s" % (len(positions), shown))
@@ -1072,54 +1133,95 @@ def main():
         remove_btn.pack(side="right")
         entry["remove_btn"] = remove_btn
 
-        gene_var = tk.StringVar(value="")
-        entry["geneName"] = gene_var
-        add_entry_row(card, 1, "Gene name", "A short gene-name label used in this ORF's output "
-                      "file names.", gene_var)
-
+        # ORF first: choosing it is what fills the gene name below, so the rows
+        # read in the order the values actually arrive.
         orf_var = tk.StringVar(value=PLACEHOLDER)
         entry["orf_file_path"] = orf_var
-        add_file_row(card, 2, "ORF", "Open the open reading frame (ORF) FASTA file for this "
+        add_file_row(card, 1, "ORF", "Open the open reading frame (ORF) FASTA file for this "
                      "gene. The ORF should begin with the ATG start codon and end with a stop "
-                     "codon. If the gene name is left blank it is derived from this file name.",
-                     orf_var)
+                     "codon. The gene name below is filled in from this file name unless you "
+                     "have typed one yourself.", orf_var)
 
-        def _autofill_gene(*_, g=gene_var, o=orf_var):
-            # When an ORF file is chosen and no gene name is set, derive one from it.
-            if not g.get().strip():
-                path = o.get()
-                if path and path != PLACEHOLDER and os.path.isfile(path):
-                    g.set(gene_name_from_orf_path(path))
+        gene_var = tk.StringVar(value="")
+        entry["geneName"] = gene_var
+        add_entry_row(card, 2, "Gene name", "A short gene-name label used in this ORF's output "
+                      "file names. Filled in from the ORF file name when you have not typed "
+                      "one; once you type your own it is never overwritten.", gene_var)
+
+        def _autofill_gene(*_, e=entry, g=gene_var, o=orf_var):
+            """Derive the gene name from the ORF file, without clobbering a typed one.
+
+            Tracking the value we last wrote is what separates a name the user
+            typed from one an earlier ORF choice produced: a stale auto-filled
+            name is replaced when the ORF changes, a hand-typed one is kept.
+            """
+            current = g.get().strip()
+            if current and current != e.get("_gene_autofilled"):
+                return
+            path = o.get()
+            if path and path != PLACEHOLDER and os.path.isfile(path):
+                derived = gene_name_from_orf_path(path)
+                g.set(derived)
+                e["_gene_autofilled"] = derived
 
         orf_var.trace_add("write", _autofill_gene)
 
-        # Per-ORF flank rows (rows 3-4); shown/hidden by the flank mode.
+        # How this ORF's flanks arrive: two separate files, or one file holding
+        # the ORF with its flanks around it. Row 3; hidden in global flank mode.
+        source_var = tk.StringVar(value="separate")
+        entry["flank_source"] = source_var
+        source_bar = ttk.Frame(card, style="Card.TFrame")
+        source_bar.grid(row=3, column=0, columnspan=2, sticky="we", padx=14, pady=(4, 0))
+        ttk.Label(source_bar, text="Flanks:", style="Path.TLabel").pack(side="left", padx=(0, 10))
+        sep_radio = ttk.Radiobutton(source_bar, text="Separate flank files", value="separate",
+                                    variable=source_var, style="Mode.TRadiobutton")
+        sep_radio.pack(side="left", padx=(0, 18))
+        plus_radio = ttk.Radiobutton(source_bar, text="ORF + flanks in one file", value="combined",
+                                     variable=source_var, style="Mode.TRadiobutton")
+        plus_radio.pack(side="left")
+        attach_tip(sep_radio, "Give this ORF's 5' and 3' flanks as two separate FASTA files.")
+        attach_tip(plus_radio, ORF_PLUS_FIELD[2])
+        entry["source_widgets"] = [source_bar]
+
+        # Separate flank rows (4-5).
         flank_widgets = []
         for i, (key, blabel, tip) in enumerate(ORF_FLANK_FIELDS):
             var = tk.StringVar(value=PLACEHOLDER)
             entry[key] = var
-            flank_widgets += add_file_row(card, 3 + i, blabel, tip, var)
+            flank_widgets += add_file_row(card, 4 + i, blabel, tip, var)
         entry["flank_widgets"] = flank_widgets
+
+        # Combined ORF + flanks row (6); the alternative to the two rows above.
+        plus_key, plus_label, plus_tip = ORF_PLUS_FIELD
+        plus_var = tk.StringVar(value=PLACEHOLDER)
+        entry[plus_key] = plus_var
+        entry["orf_plus_widgets"] = add_file_row(card, 6, plus_label, plus_tip, plus_var,
+                                                 button_text="Browse  ORF + flanks",
+                                                 button_width=32)
+
+        source_var.trace_add("write", lambda *_, e=entry: apply_orf_flank_source(e))
 
         sel_var = tk.StringVar(value=PLACEHOLDER)
         entry["codon_selection_file_path"] = sel_var
-        add_file_row(card, 5, "Codon selection (optional)", "Choose specific chimera insertion "
-                     "points for THIS ORF from an .xlsx file (residue numbers in column 1); "
-                     "overrides the codon sampling frequency below.", sel_var,
-                     button_text="Codon Selection: by File", button_width=32)
+        add_file_row(card, 7, "Codon selection (optional)", "OPTIONAL. Choose specific chimera "
+                     "insertion points for THIS ORF from an .xlsx file (residue numbers in "
+                     "column 1); overrides the codon sampling frequency below. Leave unset to "
+                     "scan by the sampling frequency.", sel_var,
+                     button_text="Codon Selection: by File (optional)", button_width=36,
+                     optional=True)
 
         # Graphical alternative to the .xlsx: pick insertion codons from the protein.
         entry["codon_positions"] = []
-        picked_var = tk.StringVar(value="No codons picked graphically")
+        picked_var = tk.StringVar(value=NO_CODONS_PICKED)
         entry["_picked_var"] = picked_var
         picked_lbl = ttk.Label(card, textvariable=picked_var, style="Path.TLabel",
                                wraplength=560, anchor="w", justify="left")
-        picked_lbl.grid(row=6, column=0, sticky="we", padx=(14, 6), pady=10)
-        pick_btn = ttk.Button(card, text="Codon Selection: by Codon Picker",
-                              style="Browse.TButton", width=32,
+        picked_lbl.grid(row=8, column=0, sticky="we", padx=(14, 6), pady=10)
+        pick_btn = ttk.Button(card, text="Codon Selection: by Codon Picker (optional)",
+                              style="Browse.TButton", width=36,
                               command=lambda e=entry: open_codon_picker(e))
-        pick_btn.grid(row=6, column=1, sticky="e", padx=(6, 14), pady=10)
-        attach_tip(picked_lbl, "Pick specific insertion codons graphically from this ORF's "
+        pick_btn.grid(row=8, column=1, sticky="e", padx=(6, 14), pady=10)
+        attach_tip(picked_lbl, "OPTIONAL. Pick specific insertion codons graphically from this ORF's "
                    "protein sequence (translated from the ORF FASTA). An alternative to the "
                    ".xlsx above; if both are set, the picked codons are added to it.", pick_btn)
 
@@ -1302,7 +1404,9 @@ def main():
     # --- Shared input files ---------------------------------------------
     card = section("Shared input files", 0)
     for r, (key, blabel, tip) in enumerate(SHARED_FILE_FIELDS):
-        add_file_row(card, r, blabel, tip, shared_file_vars[key])
+        # A field whose own label says "(optional)" says so on its path line too.
+        add_file_row(card, r, blabel, tip, shared_file_vars[key],
+                     optional="(optional)" in blabel)
 
     # Local BLAST database: browse to any member file; store the -db prefix.
     db_row = len(SHARED_FILE_FIELDS)
@@ -1420,8 +1524,11 @@ def main():
             if positions:
                 orf["codon_selection_positions"] = list(positions)
             if per_orf_mode:
-                orf["flank5_file_path"] = entry["flank5_file_path"].get()
-                orf["flank3_file_path"] = entry["flank3_file_path"].get()
+                if entry["flank_source"].get() == "combined":
+                    orf["orf_plus_file_path"] = entry["orf_plus_file_path"].get()
+                else:
+                    orf["flank5_file_path"] = entry["flank5_file_path"].get()
+                    orf["flank3_file_path"] = entry["flank3_file_path"].get()
             orfs.append(orf)
         return orfs
 
@@ -1459,7 +1566,12 @@ def main():
                                      "ORF %d (%s): please select the ORF file." % (i, orf["geneName"]))
                 return False
             if flank_mode.get() == "per_orf":
-                for key, name in (("flank5_file_path", "5' flank"), ("flank3_file_path", "3' flank")):
+                if "orf_plus_file_path" in orf:
+                    needed = (("orf_plus_file_path", "ORF + flanks"),)
+                else:
+                    needed = (("flank5_file_path", "5' flank"),
+                              ("flank3_file_path", "3' flank"))
+                for key, name in needed:
                     if not _is_set(orf[key]):
                         messagebox.showerror("Missing input",
                                              "ORF %d (%s): please select the %s file."

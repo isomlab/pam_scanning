@@ -146,6 +146,39 @@ def _resolve_flank(sequence, path, label):
 	return _read_fasta_sequence(path)
 
 
+def split_orf_plus(orf_plus_sequence, orf_sequence):
+	"""Split a combined 5' flank + ORF + 3' flank sequence around the ORF.
+
+	The ORF is located by exact match rather than by assuming a flank length, so
+	a file using any flank size works and a mismatch is reported instead of
+	silently yielding the wrong flanks. Returns ``(flank5, flank3)``.
+	"""
+	combined = str(orf_plus_sequence).upper()
+	orf = str(orf_sequence).upper()
+	if not orf:
+		raise ValueError("The ORF sequence is empty, so it cannot be located in the ORF-plus file.")
+	occurrences = combined.count(orf)
+	if occurrences == 0:
+		raise ValueError(
+			"The ORF sequence was not found in the ORF-plus file. That file must contain "
+			"the ORF verbatim, with the upstream and downstream flanks around it."
+		)
+	if occurrences > 1:
+		raise ValueError(
+			"The ORF sequence occurs %d times in the ORF-plus file, so the flanks are "
+			"ambiguous. Supply the flanks separately instead." % occurrences
+		)
+	start = combined.index(orf)
+	flank5, flank3 = combined[:start], combined[start + len(orf):]
+	if not flank5 or not flank3:
+		raise ValueError(
+			"The ORF-plus file leaves a %s flank of zero length (5' = %d bp, 3' = %d bp). "
+			"Scanning needs sequence on both sides of the ORF."
+			% ("5'" if not flank5 else "3'", len(flank5), len(flank3))
+		)
+	return flank5, flank3
+
+
 def _write_flank_qc(qcPath, geneName, label, path, sequence):
 	"""Preserve the flank in QC: copy its FASTA, or write the entered sequence as one."""
 	from os import sep
@@ -188,6 +221,9 @@ def pamscan(**kwargs):
 	# Each flank arrives either as a FASTA path or as a literal sequence.
 	flank5_file_path = kwargs.get('flank5_file_path', NOT_SELECTED)   # 100 bp upstream of the ATG (the "-" side)
 	flank3_file_path = kwargs.get('flank3_file_path', NOT_SELECTED)   # 100 bp downstream of the stop (the "+" side)
+	# A single FASTA holding flank5 + ORF + flank3; an alternative to the two
+	# separate flank inputs. The ORF file is still required, and locates the ORF.
+	orf_plus_file_path = kwargs.get('orf_plus_file_path', NOT_SELECTED)
 	flank5_sequence = kwargs.get('flank5_sequence')
 	flank3_sequence = kwargs.get('flank3_sequence')
 	local_genome_file_path = kwargs['local_genome_file_path']
@@ -216,13 +252,25 @@ def pamscan(**kwargs):
 		print("ORF file is required")
 		return 0
 
-	if not _is_provided(flank5_file_path) and not _is_provided(flank5_sequence):
-		print("5' flank (100 bp upstream of ATG) is required: give a FASTA file or a sequence")
-		return 0
+	if _is_provided(orf_plus_file_path):
+		clashes = [label for label, value in (
+			("5' flank file", flank5_file_path),
+			("3' flank file", flank3_file_path),
+			("5' flank sequence", flank5_sequence),
+			("3' flank sequence", flank3_sequence),
+		) if _is_provided(value)]
+		if clashes:
+			print("An ORF-plus file supplies both flanks, so do not also give: %s"
+			      % ", ".join(clashes))
+			return 0
+	else:
+		if not _is_provided(flank5_file_path) and not _is_provided(flank5_sequence):
+			print("5' flank (100 bp upstream of ATG) is required: give a FASTA file or a sequence")
+			return 0
 
-	if not _is_provided(flank3_file_path) and not _is_provided(flank3_sequence):
-		print("3' flank (100 bp downstream of stop) is required: give a FASTA file or a sequence")
-		return 0
+		if not _is_provided(flank3_file_path) and not _is_provided(flank3_sequence):
+			print("3' flank (100 bp downstream of stop) is required: give a FASTA file or a sequence")
+			return 0
 
 	if local_genome_file_path == 'No file selected':
 		print("Local genome file is required")
@@ -301,8 +349,15 @@ def pamscan(**kwargs):
 	# A) Get the ORF sequence (ATG to stop) and the 100 bp genomic flanks on each side.
 	# Flanks come from a FASTA file or straight from an entered sequence.
 	orfSequence = _read_fasta_sequence(orf_file_path)
-	flank5Sequence = _resolve_flank(flank5_sequence, flank5_file_path, "5'")   # 100 bp upstream of the ATG
-	flank3Sequence = _resolve_flank(flank3_sequence, flank3_file_path, "3'")   # 100 bp downstream of the stop
+	if _is_provided(orf_plus_file_path):
+		# One file carries both flanks: find the ORF inside it and slice them off.
+		flank5Sequence, flank3Sequence = split_orf_plus(
+			_read_fasta_sequence(orf_plus_file_path), orfSequence)
+		print("ORF-plus file: 5' flank %d bp, ORF %d bp, 3' flank %d bp"
+		      % (len(flank5Sequence), len(orfSequence), len(flank3Sequence)))
+	else:
+		flank5Sequence = _resolve_flank(flank5_sequence, flank5_file_path, "5'")   # 100 bp upstream of the ATG
+		flank3Sequence = _resolve_flank(flank3_sequence, flank3_file_path, "3'")   # 100 bp downstream of the stop
 
 	# B) Assemble the ORF-plus-context sequence: 5' flank + ORF + 3' flank. This is the
 	# sequence the whole algorithm scans; building it from explicit flanks lets us reach

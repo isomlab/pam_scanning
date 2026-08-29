@@ -36,6 +36,20 @@ batch of ORFs::
 
 For a given side, pass the FASTA flag or the sequence flag, not both. A per-ORF
 flank from a manifest or folder takes precedence over a global flank sequence.
+
+Instead of two separate flank files, the ORF and both its flanks may be given as
+ONE FASTA with ``--orf-plus``::
+
+    pam-scan --orf FUS3_coding.fa --orf-plus FUS3_orfPlus.fa \\
+        --gene-name Fus3 --genome genome.fsa --output ./results
+
+``--orf`` is still required: the ORF is located inside the combined sequence by
+exact match and the flanks are taken from either side, so the flanks may be any
+length rather than a fixed 100 bp. The run fails with a clear message if the ORF
+is absent from that file, occurs more than once, or leaves a flank of zero
+length. ``--orf-plus`` is mutually exclusive with ``--flank5``/``--flank3`` and
+their ``-seq`` forms. In a manifest the column is ``orf_plus``; in a folder the
+filename suffix is ``_orfPlus`` (also ``_withFlanks``).
 """
 
 import argparse
@@ -85,7 +99,7 @@ DEFAULTS = {
 
 # Keys that vary per ORF (supplied by single-ORF flags or by manifest rows).
 PER_ORF_KEYS = ("geneName", "orf_file_path", "flank5_file_path", "flank3_file_path",
-                "codon_selection_file_path")
+                "orf_plus_file_path", "codon_selection_file_path")
 
 # chimeras.pamscan treats this sentinel as "not provided".
 NOT_SELECTED = "No file selected"
@@ -120,6 +134,12 @@ def _build_parser():
     p.add_argument("--flank3", dest="flank3_file_path",
                    help="3' flank FASTA: 100 bp downstream of the stop (the '+' side). Single ORF, "
                         "or a GLOBAL 3' flank applied to every ORF in --manifest/--orf-dir.")
+    p.add_argument("--orf-plus", dest="orf_plus_file_path",
+                   help="FASTA holding the 5' flank, the ORF and the 3' flank as ONE "
+                        "sequence. An alternative to --flank5/--flank3: the ORF is located "
+                        "inside it by exact match and the flanks are taken from either side, "
+                        "so any flank length works. --orf is still required. Mutually "
+                        "exclusive with --flank5/--flank3 and their -seq forms.")
     p.add_argument("--flank5-seq", dest="flank5_sequence",
                    help="5' flank as a literal sequence instead of a FASTA file. Mutually "
                         "exclusive with --flank5.")
@@ -192,6 +212,8 @@ _MANIFEST_COLUMNS = {
     "orf": "orf_file_path",
     "flank5": "flank5_file_path", "5flank": "flank5_file_path", "upstream": "flank5_file_path",
     "flank3": "flank3_file_path", "3flank": "flank3_file_path", "downstream": "flank3_file_path",
+    "orf_plus": "orf_plus_file_path", "orfplus": "orf_plus_file_path",
+    "orf+flanks": "orf_plus_file_path", "orf_flanks": "orf_plus_file_path",
     "codon_selection": "codon_selection_file_path",
     "codon-selection": "codon_selection_file_path",
     "codonselection": "codon_selection_file_path",
@@ -248,6 +270,8 @@ _XLSX_EXTS = (".xlsx",)
 # codon-selection suffixes are checked before the ORF suffixes (no stem ends in
 # more than one, but this keeps intent explicit).
 _ROLE_SUFFIXES = (
+    ("orf_plus_file_path",
+     ("_orfplus", "_orf_plus", "_orfcontext", "_withflanks", "_plusflanks")),
     ("flank5_file_path", ("_flank5", "_5flank", "_upstream", "_5prime", "_5p")),
     ("flank3_file_path", ("_flank3", "_3flank", "_downstream", "_3prime", "_3p")),
     ("codon_selection_file_path",
@@ -295,6 +319,7 @@ def discover_orf_folder(path):
     * ORF:           ``_coding`` / ``_orf`` / ``_cds``          (FASTA)
     * 5' flank:      ``_flank5`` / ``_5flank`` / ``_upstream``  (FASTA)
     * 3' flank:      ``_flank3`` / ``_3flank`` / ``_downstream``(FASTA)
+    * ORF + flanks:  ``_orfPlus`` / ``_withFlanks``              (FASTA)
     * codon select.: ``_codonSelection`` / ``_codons``          (.xlsx)
 
     The gene name is the filename stem with the role suffix removed, and a
@@ -426,11 +451,24 @@ def _validate(kwargs):
         "local_genome_file_path": "--genome",
     }
     missing = [flag for key, flag in required.items() if not _is_set(kwargs.get(key))]
-    # Each flank may arrive as a FASTA file or as a sequence; one of the two is required.
-    for side in ("5", "3"):
-        if not _is_set(kwargs.get("flank%s_file_path" % side)) \
-                and not _is_set(kwargs.get("flank%s_sequence" % side)):
-            missing.append("--flank%s / --flank%s-seq / manifest 'flank%s'" % (side, side, side))
+    if _is_set(kwargs.get("orf_plus_file_path")):
+        # One file carries both flanks, so the separate flank inputs must be absent.
+        clashes = [flag for key, flag in (
+            ("flank5_file_path", "--flank5 / manifest 'flank5'"),
+            ("flank3_file_path", "--flank3 / manifest 'flank3'"),
+            ("flank5_sequence", "--flank5-seq"),
+            ("flank3_sequence", "--flank3-seq"),
+        ) if _is_set(kwargs.get(key))]
+        if clashes:
+            sys.exit("Error: --orf-plus supplies both flanks, so do not also give: %s"
+                     % ", ".join(clashes))
+    else:
+        # Each flank may arrive as a FASTA file or as a sequence; one of the two is required.
+        for side in ("5", "3"):
+            if not _is_set(kwargs.get("flank%s_file_path" % side)) \
+                    and not _is_set(kwargs.get("flank%s_sequence" % side)):
+                missing.append("--flank%s / --flank%s-seq / --orf-plus / manifest 'flank%s'"
+                               % (side, side, side))
     if missing:
         sys.exit("Error: missing required input(s): %s" % ", ".join(sorted(missing)))
 
@@ -439,6 +477,7 @@ def _validate(kwargs):
 
     # Only the file form has a path to check; sequences were validated at parse time.
     for key, flag in (("orf_file_path", "--orf"),
+                      ("orf_plus_file_path", "--orf-plus"),
                       ("flank5_file_path", "--flank5"),
                       ("flank3_file_path", "--flank3"),
                       ("local_genome_file_path", "--genome")):

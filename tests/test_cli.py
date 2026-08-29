@@ -300,3 +300,49 @@ def test_codon_positions_absent_by_default():
         "--genome", "/tmp/genome.fsa", "--gene-name", "Fus3",
     ])
     assert "codon_selection_positions" not in base
+
+
+# --- --orf-plus wiring ---------------------------------------------------
+
+def test_orf_plus_flag_parses_into_kwarg():
+    kwargs, _ = cli.build_kwargs([
+        "--orf", "o.fa", "--orf-plus", "op.fa", "--gene-name", "G",
+        "--genome", "g.fsa", "--output", "out"])
+    assert kwargs["orf_plus_file_path"] == "op.fa"
+
+
+def test_orf_plus_absent_by_default():
+    kwargs, _ = cli.build_kwargs([
+        "--orf", "o.fa", "--flank5", "a.fa", "--flank3", "b.fa",
+        "--gene-name", "G", "--genome", "g.fsa", "--output", "out"])
+    assert not cli._is_set(kwargs.get("orf_plus_file_path"))
+
+
+def test_orf_plus_is_a_per_orf_key():
+    assert "orf_plus_file_path" in cli.PER_ORF_KEYS
+
+
+def test_manifest_accepts_an_orf_plus_column(tmp_path):
+    manifest = tmp_path / "orfs.tsv"
+    manifest.write_text("gene\torf\torf_plus\nFus3\tfus3.fa\tfus3_plus.fa\n")
+    rows = cli._load_manifest(str(manifest))
+    assert rows[0]["orf_plus_file_path"].endswith("fus3_plus.fa")
+
+
+def test_folder_discovery_recognizes_an_orf_plus_suffix(tmp_path):
+    (tmp_path / "Fus3_coding.fa").write_text(">x\nATG\n")
+    (tmp_path / "Fus3_orfPlus.fa").write_text(">x\nAAATGTTT\n")
+    orfs, skipped = cli.discover_orf_folder(str(tmp_path))
+    assert skipped == []
+    assert len(orfs) == 1
+    assert orfs[0]["orf_plus_file_path"].endswith("Fus3_orfPlus.fa")
+    assert orfs[0]["orf_file_path"].endswith("Fus3_coding.fa")
+
+
+def test_orf_plus_suffix_does_not_swallow_the_plain_orf_suffix(tmp_path):
+    """'_orf' must not match '_orfPlus', or the ORF and the combined file collide."""
+    (tmp_path / "Fus3_orf.fa").write_text(">x\nATG\n")
+    (tmp_path / "Fus3_orfPlus.fa").write_text(">x\nAAATGTTT\n")
+    orfs, _ = cli.discover_orf_folder(str(tmp_path))
+    assert orfs[0]["orf_file_path"].endswith("Fus3_orf.fa")
+    assert orfs[0]["orf_plus_file_path"].endswith("Fus3_orfPlus.fa")

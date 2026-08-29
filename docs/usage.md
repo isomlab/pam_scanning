@@ -16,6 +16,7 @@ For *what* the tool computes (the algorithm behind these parameters), see
 | `--flank5-seq` | `flank5_sequence` | *(one flank per side required)* | The 5′ flank as a literal sequence instead of a FASTA file. Mutually exclusive with `--flank5`. [†](#notes-on-specific-options) |
 | `--flank3` | `flank3_file_path` | *(one flank per side required)* | FASTA of the 100 bp immediately **downstream** of the stop (the `+` side). Lets the scan reach positions at the end of the ORF. |
 | `--flank3-seq` | `flank3_sequence` | *(one flank per side required)* | The 3′ flank as a literal sequence instead of a FASTA file. Mutually exclusive with `--flank3`. |
+| `--orf-plus` | `orf_plus_file_path` | *(none)* | FASTA holding the 5′ flank, the ORF and the 3′ flank as **one** sequence, instead of `--flank5`/`--flank3`. `--orf` is still required and locates the ORF inside it, so the flanks may be any length. Mutually exclusive with `--flank5`/`--flank3` and their `-seq` forms. |
 | `--manifest` | *(n/a)* | *(none)* | TSV of ORFs (one row each) for batch runs; see [Multiple ORFs](#multiple-orfs). |
 | `--genome` | `local_genome_file_path` | bundled BY4741 genome | The **yeast** host genome FASTA for off-target checks. [†](#notes-on-specific-options) |
 | `--blast-db` | `localBlastDb` | *(auto)* | **Optional.** A prebuilt BLAST+ database. Built automatically from `--genome` when omitted. [†](#notes-on-specific-options) |
@@ -112,7 +113,7 @@ run directory. There are two ways to supply them.
 
 List one ORF per row in a tab-separated **manifest** and supply the shared
 parameters with flags or `--config`. Recognized columns: `gene`, `orf`, `flank5`,
-`flank3` (required) and `codon_selection` (optional); relative paths resolve
+`flank3` (or `orf_plus` in their place) and `codon_selection` (optional); relative paths resolve
 against the manifest's directory. See `examples/manifest.tsv`.
 
 ```tsv
