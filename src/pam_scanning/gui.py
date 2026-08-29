@@ -85,6 +85,26 @@ TIP_BG = "#fffbe6"
 TIP_BORDER = "#c9b458"
 INVALID = "#b00020"     # sequence box holds non-DNA characters
 # Scrolling (Tk 9 delivers trackpad scroll as <TouchpadScroll>, decoded to pixel deltas).
+def wheel_step(num, delta):
+    """Scroll steps for one wheel event: -1 moves the view up, +1 down, 0 nothing.
+
+    This is Tk's own convention, not a house one. ``::tk::MouseWheel`` divides
+    the delta by a NEGATIVE factor (-40.0 units, -4.0 pixels), so a positive
+    delta scrolls the view UP; the X11 buttons follow, 4 being wheel-up. macOS
+    flips the delta itself when "Natural scrolling" is toggled, so honouring the
+    platform sign is what makes this app agree with the user's system setting,
+    and with every other application, under either setting. Do not negate it
+    again here: that is what made scrolling run backwards.
+    """
+    if num == 4:            # X11 wheel up
+        return -1
+    if num == 5:            # X11 wheel down
+        return 1
+    if not delta:
+        return 0
+    return 1 if delta < 0 else -1
+
+
 TOUCHPAD_SCALE = 1.4      # pixels scrolled per unit of trackpad delta
 MOUSE_WHEEL_PIXELS = 40   # pixels per mouse-wheel notch
 CONSOLE_BG = "#0f1b28"  # progress console background
@@ -525,20 +545,18 @@ class CodonPicker(tk.Toplevel):
             pass
 
     def _scroll_wheel(self, target, event):
-        if getattr(event, "num", None) == 4:
-            step = 1
-        elif getattr(event, "num", None) == 5:
-            step = -1
-        else:
-            step = 1 if getattr(event, "delta", 0) > 0 else -1
-        target.yview_scroll(step, "units")
+        step = wheel_step(getattr(event, "num", None), getattr(event, "delta", 0))
+        if step:
+            target.yview_scroll(step, "units")
         return "break"
 
     def _scroll_touch(self, target, event):
         try:
             _dx, dy = self.tk.call("tk::PreciseScrollDeltas", event.delta)
             if dy:
-                target.yview_scroll(int(dy), "units")
+                # Negated, as Tk's own <TouchpadScroll> bindings do. This was the
+                # one place scrolling ran opposite to the rest of the window.
+                target.yview_scroll(-int(dy), "units")
         except tk.TclError:
             pass
         return "break"
@@ -719,21 +737,22 @@ def main():
     def _touchpad_dy(event):
         try:
             _dx, dy = (int(v) for v in root.tk.call("tk::PreciseScrollDeltas", event.delta))
-            return -dy   # reversed so the main window scrolls the way the trackpad expects
+            # Tk's own bindings negate the precise delta (see the Listbox
+            # <TouchpadScroll> binding in listbox.tcl), so this matches Tk.
+            return -dy
         except Exception:
             return 0
 
     def _wheel_direction(event):
-        """Mouse-wheel direction as +1 (content down) / -1 (content up) / 0. Reversed
-        from the raw platform sign so the main window scrolls the same way as the
-        codon picker."""
-        if event.num == 4:
-            return 1
-        if event.num == 5:
-            return -1
-        if not event.delta:
-            return 0
-        return -1 if event.delta < 0 else 1
+        """Mouse-wheel direction as +1 (view moves down) / -1 (view moves up) / 0.
+
+        Follows Tk's own sign rather than reversing it. ``::tk::MouseWheel``
+        divides the delta by a NEGATIVE factor (-40.0 for units, -4.0 for
+        pixels), so a positive delta scrolls the view up. macOS already flips
+        the delta itself when "Natural scrolling" is toggled, so honouring the
+        platform sign makes this app agree with the user's system setting and
+        with every other application, under either setting."""
+        return wheel_step(getattr(event, "num", None), getattr(event, "delta", 0))
 
     def _event_in_main(event):
         """True only when the scroll happened over the main window, not a modal on top
