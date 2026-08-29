@@ -1133,24 +1133,36 @@ def main():
         remove_btn.pack(side="right")
         entry["remove_btn"] = remove_btn
 
-        gene_var = tk.StringVar(value="")
-        entry["geneName"] = gene_var
-        add_entry_row(card, 1, "Gene name", "A short gene-name label used in this ORF's output "
-                      "file names.", gene_var)
-
+        # ORF first: choosing it is what fills the gene name below, so the rows
+        # read in the order the values actually arrive.
         orf_var = tk.StringVar(value=PLACEHOLDER)
         entry["orf_file_path"] = orf_var
-        add_file_row(card, 2, "ORF", "Open the open reading frame (ORF) FASTA file for this "
+        add_file_row(card, 1, "ORF", "Open the open reading frame (ORF) FASTA file for this "
                      "gene. The ORF should begin with the ATG start codon and end with a stop "
-                     "codon. If the gene name is left blank it is derived from this file name.",
-                     orf_var)
+                     "codon. The gene name below is filled in from this file name unless you "
+                     "have typed one yourself.", orf_var)
 
-        def _autofill_gene(*_, g=gene_var, o=orf_var):
-            # When an ORF file is chosen and no gene name is set, derive one from it.
-            if not g.get().strip():
-                path = o.get()
-                if path and path != PLACEHOLDER and os.path.isfile(path):
-                    g.set(gene_name_from_orf_path(path))
+        gene_var = tk.StringVar(value="")
+        entry["geneName"] = gene_var
+        add_entry_row(card, 2, "Gene name", "A short gene-name label used in this ORF's output "
+                      "file names. Filled in from the ORF file name when you have not typed "
+                      "one; once you type your own it is never overwritten.", gene_var)
+
+        def _autofill_gene(*_, e=entry, g=gene_var, o=orf_var):
+            """Derive the gene name from the ORF file, without clobbering a typed one.
+
+            Tracking the value we last wrote is what separates a name the user
+            typed from one an earlier ORF choice produced: a stale auto-filled
+            name is replaced when the ORF changes, a hand-typed one is kept.
+            """
+            current = g.get().strip()
+            if current and current != e.get("_gene_autofilled"):
+                return
+            path = o.get()
+            if path and path != PLACEHOLDER and os.path.isfile(path):
+                derived = gene_name_from_orf_path(path)
+                g.set(derived)
+                e["_gene_autofilled"] = derived
 
         orf_var.trace_add("write", _autofill_gene)
 
