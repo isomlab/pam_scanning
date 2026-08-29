@@ -27,6 +27,31 @@ def _is_provided(value):
 	return bool(value) and value != NOT_SELECTED
 
 
+# Working recommendation for homology-arm length in nt. Shorter arms still work,
+# so this only decides whether a shortened arm is worth mentioning as suboptimal.
+RECOMMENDED_HOMOLOGY = 60
+
+
+def homology_arms(sequence, insertion_index, length5, length3):
+	"""Left and right homology arms flanking an insertion point.
+
+	*insertion_index* is the position of the insertion codon within the
+	assembled ORF-plus sequence, and the arms run outward from just after it.
+
+	Both slices are clamped to the sequence. Without clamping the left index
+	goes negative when the 5' flank is shorter than the arm, Python then reads
+	from the END of the sequence, and the arm comes back empty, which yields a
+	primer consisting of nothing but its suffix. Clamping shortens the arm to
+	the flanking sequence actually supplied instead. About 60 nt of homology is
+	the working recommendation and less still works, so a short arm is a note,
+	not a failure.
+	"""
+	start = max(0, insertion_index - length5 + 3)
+	left = sequence[start:insertion_index + 3]
+	right = sequence[insertion_index + 3:insertion_index + 3 + length3]
+	return left, right
+
+
 def default_codon_table_path():
 	"""Return the path to the yeast codon table bundled as package data."""
 	from importlib import resources
@@ -541,6 +566,10 @@ def pamscan(**kwargs):
 	cell.value = "Primer Guide"
 
 	codonKeys, row, primerOrderGuides, primerOrderInserts = sorted(optiGuides), 2, {}, {}
+	# Insertion sites whose homology arm ran into the end of the supplied
+	# sequence, i.e. the flank was shorter than the arm. Reported below rather
+	# than passed over in silence: the primers are usable but shorter.
+	shortHomologyArms = []
 	for codonKey in codonKeys:
 
 		if codonKey in noOptiGuideCodonSet:
@@ -560,8 +589,11 @@ def pamscan(**kwargs):
 		silencedOrf = silencedGuides[guideKey][1]
 		primerLengthF = primerLength - len(insertPrimerForwardSuffix)
 		primerLengthR = primerLength - len(insertPrimerReverseSuffix)
-		leftHomologyArm = silencedOrf[codonKey[0]-primerLengthF+3:codonKey[0]+3]
-		rightHomologyArm = silencedOrf[codonKey[0]+3:codonKey[0]+3+primerLengthR]
+		leftHomologyArm, rightHomologyArm = homology_arms(
+			silencedOrf, codonKey[0], primerLengthF, primerLengthR)
+		if len(leftHomologyArm) < primerLengthF or len(rightHomologyArm) < primerLengthR:
+			shortHomologyArms.append(
+				(codonNumber, len(leftHomologyArm), len(rightHomologyArm)))
 		primerF = leftHomologyArm + insertPrimerForwardSuffix
 		primerR = reverseComplement(rightHomologyArm) + insertPrimerReverseSuffix
 		primerNameGuide = str(guideKey[0]) + ".gF"
@@ -777,6 +809,21 @@ def pamscan(**kwargs):
 		geneName, nCodons, len(orfSequence), fractionScannable,
 		designedSites, len(codons), len(noOptiGuideCodonSet),
 		len(primerOrderGuides), len(primerOrderInserts), len(writeInclusions), outputPath)
+	if shortHomologyArms:
+		# About 60 nt of homology is the working recommendation and less still
+		# works, so a shortened arm is reported rather than treated as a failure.
+		# Only arms below that are called out as worth a longer flank.
+		shortest = min(min(l, r) for _c, l, r in shortHomologyArms)
+		asked = primerLength - len(insertPrimerForwardSuffix)
+		below = [c for c, l, r in shortHomologyArms if min(l, r) < RECOMMENDED_HOMOLOGY]
+		note = ("%d of them fall below the recommended %d nt of homology (codons %s), so a "
+		        "longer flank would help there." % (len(below), RECOMMENDED_HOMOLOGY,
+		                                            ", ".join(str(c) for c in below))
+		        if below else
+		        "All remain at or above the recommended %d nt of homology." % RECOMMENDED_HOMOLOGY)
+		print("Note: %d insertion site(s) have a homology arm shortened by the end of the "
+		      "supplied sequence (shortest %d nt, against %d nt requested). %s"
+		      % (len(shortHomologyArms), shortest, asked, note))
 	print(summary)
 	with open(qcPath + geneName + "-summary.txt", "w") as summaryFile:
 		summaryFile.write(summary + "\n")
